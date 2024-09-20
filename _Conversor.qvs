@@ -1,0 +1,17 @@
+/*-----------------------------------------------------------------------------------------------------------------------------------------------
+Compañia: 		  Eficacia S.A
+Proceso:		    Conversor Sevilla sa Sharepoint-QVD
+Desarrollador: 	William Alejandro Giraldo Zuluaga
+Fecha			      2023/08/23 (YYYY/MM/DD)
+-----------------------------------------------------------------------------------------------------------------------------------------------*/
+
+    PrecioSugerido:
+      LOAD
+          [ID PRODUCTO],
+		  [PRECIO SUGERIDO]
+
+      FROM [lib://COMP_SharePoint_Internal (eficacia_admin_analitica)/SGI/Colombia/SEVILLA_SA/PrecioSugerido.xlsx]
+      (ooxml, embedded labels, table is [Precio Sugeridos]); 
+
+STORE PrecioSugerido INTO [lib://COMP_Stage (eficacia_admin_analitica)/SGI/Colombia/SEVILLA_SA/Sh_PrecioSugerido.qvd] (qvd);
+Drop Table PrecioSugerido;

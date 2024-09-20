@@ -1,0 +1,109 @@
+﻿/*-----------------------------------------------------------------------------------------------------------------------------------------------
+Compañia: 		Eficacia S.A
+Proceso:		Transformacion Precios
+Desarrollador:  Daniel Alejandro Cerquera Castro
+Email:          daniel_cerquera@eficacia.com
+Fecha           2023/08/04 (YYYY/MM/DD)
+Estado:         Activo
+-----------------------------------------------------------------------------------------------------------------------------------------------*/
+Precios_Tmp1:
+	LOAD
+		ID_SUCURSAL         as Id_Sucursal,
+        PRECIO              as Valor,
+        ID_SUPERVISOR       as Id_Usuario,
+        FECHA_INICIAL       as _Fecha,
+        ID_PRODUCTO         as Id_Producto,
+        PRODUCTO            as Producto
+	FROM
+    [lib://COMP_Stage (eficacia_admin_analitica)/SGI/Colombia/SEVILLA_SA/Precios_$(Anno)$(Mes)*.qvd]
+	(qvd);
+
+/*---------*/
+NoConcatenate
+Precios_Tmp2:
+	LOAD
+		Id_Sucursal,
+        Num#(Valor)                                                         as Precio,
+        Id_Usuario,
+        DATE(left(date(_Fecha,'YYYY-MM-DD'),10),'YYYY/MM/DD')               as Fecha,
+        Id_Producto,
+        Producto
+	Resident Precios_Tmp1
+    Where
+        Valor > 0
+        and Id_Usuario <> 168874
+        and Valor <>'NP';
+    Drop Table Precios_Tmp1;
+   
+/*-----------*/
+NoConcatenate
+Precios_Tmp3:
+	LOAD
+		Id_Producto,
+		Avg(Precio)			                                    as PrecioPromedio
+	Resident Precios_Tmp2
+	Group By
+		Id_Producto;
+
+Left Join(Precios_Tmp3)
+	LOAD
+		Id_Sucursal,
+        Precio,
+        Id_Usuario,
+        Fecha,
+        Id_Producto,
+        Producto,
+        ApplyMap('Map_PrecioSugerido', Id_Producto, null())		as PrecioSugerido
+     Resident Precios_Tmp2;
+     Drop Table Precios_Tmp2;
+    
+/*---------*/
+NoConcatenate
+Precios_Tmp4:
+	LOAD
+		Id_Sucursal,
+        Precio,
+        Id_Usuario,
+        Fecha,
+        Id_Producto,
+        Producto,
+        IF(IsNull(PrecioSugerido), PrecioPromedio, PrecioSugerido)			as PrecioSugerido
+    Resident Precios_Tmp3;
+	Drop Table Precios_Tmp3;
+
+/*---------*/
+NoConcatenate
+Precios_Tmp5:
+	LOAD
+		Id_Sucursal,
+        Precio,
+        Id_Usuario,
+        Fecha,
+        Id_Producto,
+        Producto,
+        PrecioSugerido,
+        fAbs((PrecioSugerido/Precio)-1) as VSMedia
+    Resident Precios_Tmp4
+    where 
+        Precio<(PrecioSugerido+PrecioSugerido*0.3)
+	and Precio>(PrecioSugerido-PrecioSugerido*0.3);
+	Drop Table Precios_Tmp4;
+
+/*--------------*/
+NoConcatenate
+Precios:
+	LOAD distinct
+		Id_Sucursal&'-'&Id_Usuario&'-'&Id_Producto&'-'&Fecha	    as CK.Key2,
+		Precio                                                      as Precios.Valor,
+ 		Id_Producto													as Precios.Id_Producto,
+		Id_Sucursal													as Precios.Id_Sucursal,
+        Id_Usuario													as Precios.Id_Usuario,
+        Fecha														as Precios.Fecha,
+       	Producto													as Precios.Producto,
+        If(VSMedia>0.3,'No','Ok')									as Precios.Flag_Mostrar,
+        PrecioSugerido												as Precios.PrecioSugerido
+     Resident Precios_Tmp5;
+    Drop Table Precios_Tmp5; 
+		
+STORE Precios INTO [lib://COMP_DataMart (eficacia_admin_analitica)/SGI/Colombia/SEVILLA_SA/_Precios_$(Anno)$(Mes).qvd];
+Drop Table Precios;

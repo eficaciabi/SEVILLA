@@ -1,0 +1,26 @@
+﻿/*-----------------------------------------------------------------------------------------------------------------------------------------------
+Compañia: 		Eficacia S.A
+Proceso:		Tablas de Mapeo General
+Desarrollador:  María de los Ángeles Delgado
+Email:          maria_adelgado@eficacia.com
+Fecha           2023/08/04 (YYYY/MM/DD)
+Estado:         Activo
+-----------------------------------------------------------------------------------------------------------------------------------------------*/
+/*---------*/
+Map_RolAsesor:
+	Mapping
+		LOAD 
+			ASESOR_ID, 
+			ROL
+		FROM
+		[lib://COMP_Stage (eficacia_admin_analitica)/SGI/Colombia/SEVILLA_SA/IPV_Asesor.qvd]
+    	(qvd);
+
+/*---------*/
+Map_PrecioSugerido:
+	Mapping
+		LOAD
+			[ID PRODUCTO]			as IDProducto,
+			[PRECIO SUGERIDO]		as PrecioSugerido
+		FROM [lib://COMP_Stage (eficacia_admin_analitica)/SGI/Colombia/SEVILLA_SA/Sh_PrecioSugerido.qvd]
+    	(qvd); 

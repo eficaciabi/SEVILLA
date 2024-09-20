@@ -1,0 +1,91 @@
+﻿/*-----------------------------------------------------------------------------------------------------------------------------------------------
+Compañia:       Eficacia S.A 
+Proceso:        Transformacion Link Table
+Desarrollador:  María de los Ángeles Delgado
+Email:          maria_adelgado@eficacia.com
+Fecha           2023/08/04 (YYYY/MM/DD)
+Estado:         Activo
+-----------------------------------------------------------------------------------------------------------------------------------------------*/
+LinkTable_Tmp1:
+    LOAD
+        Cobertura.IdPuntoVenta          as LinkTable.IdPuntoVenta,
+        Cobertura.IdPersona             as LinkTable.IdPersona,
+        Cobertura.Fecha                 as LinkTable.Fecha
+    FROM 
+    [lib://COMP_DataMart (eficacia_admin_analitica)/SGI/Colombia/SEVILLA_SA/_Cobertura_$(Anno)$(Mes).qvd]
+    (qvd);      
+
+LinkTable_Tmp2:
+    LOAD
+        Agotados.Id_Sucursal             as LinkTable.IdPuntoVenta,
+        Agotados.Id_Usuario              as LinkTable.IdPersona,
+        Agotados.Id_Producto             as LinkTable.IdProducto,
+        Agotados.Fecha                   as LinkTable.Fecha
+    FROM [lib://COMP_DataMart (eficacia_admin_analitica)/SGI/Colombia/SEVILLA_SA/_Agotados_$(Anno)$(Mes).qvd]
+    (qvd);
+
+Concatenate
+     LOAD
+         Precios.Id_Sucursal             as LinkTable.IdPuntoVenta,
+         Precios.Id_Usuario              as LinkTable.IdPersona,
+         Precios.Id_Producto             as LinkTable.IdProducto,
+         Precios.Fecha	                 as LinkTable.Fecha
+     FROM [lib://COMP_DataMart (eficacia_admin_analitica)/SGI/Colombia/SEVILLA_SA/_Precios_$(Anno)$(Mes).qvd]
+     (qvd);
+
+//----------//
+NoConcatenate
+LinkTable_Tmp:
+    Load Distinct
+        LinkTable.IdPuntoVenta,
+        LinkTable.IdPersona,
+        LinkTable.Fecha
+    Resident LinkTable_Tmp1; 
+    Drop Table LinkTable_Tmp1;
+    
+Outer Join (LinkTable_Tmp)
+     LOAD Distinct
+         LinkTable.IdPuntoVenta,
+         LinkTable.IdPersona,
+         LinkTable.IdProducto,
+         LinkTable.Fecha    
+     Resident LinkTable_Tmp2;
+     Drop Table LinkTable_Tmp2;
+   
+//------------------------//
+NoConcatenate
+LinkTable:
+   LOAD Distinct
+        LinkTable.IdPuntoVenta&'-'&LinkTable.IdPersona&'-'&LinkTable.Fecha 					                as CK.Key1,
+        LinkTable.IdPuntoVenta&'-'&LinkTable.IdPersona&'-'&LinkTable.IdProducto&'-'&LinkTable.Fecha 		as CK.Key2,
+        LinkTable.IdPuntoVenta                                                                              as SK.PuntoVenta,
+        LinkTable.IdPersona                                                                                 as SK.Persona,
+        LinkTable.IdProducto																                as SK.Producto,		
+        LinkTable.Fecha																		                as SK.Fecha
+    Resident LinkTable_Tmp;
+    
+STORE LinkTable INTO [lib://COMP_DataMart (eficacia_admin_analitica)/SGI/Colombia/SEVILLA_SA/_LinkTable_$(Anno)$(Mes).qvd];
+Drop Table LinkTable;
+
+Calendario_Tmp:
+    LOAD DISTINCT
+        LinkTable.Fecha                         as Fecha
+    Resident LinkTable_Tmp;
+    Drop Table LinkTable_Tmp;
+    
+/*---------*/
+NoConcatenate
+Calendario:
+    LOAD
+        Fecha                                   as SK.Fecha,
+        Fecha                                   as Calendario.Fecha,       
+        Year(Fecha)&'-'&Num(Month(Fecha),'00')  as Calendario.Periodo,
+        Day(Fecha)                              as Calendario.Dia,
+        Capitalize(Date(Fecha, 'MMMM'))         as Calendario.Mes,
+        Num(Month(Fecha),'00')                  as Calendario.MesNum, 
+        Year(Fecha)                             as Calendario.Año
+    Resident Calendario_Tmp;
+    Drop Table Calendario_Tmp;
+
+STORE Calendario INTO [lib://COMP_DataMart (eficacia_admin_analitica)/SGI/Colombia/SEVILLA_SA/_Calendario_$(Anno)$(Mes).qvd] (qvd);
+Drop Table Calendario;

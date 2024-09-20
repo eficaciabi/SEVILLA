@@ -1,0 +1,119 @@
+﻿/*-----------------------------------------------------------------------------------------------------------------------------------------------
+Compañia: 		Eficacia S.A
+Proceso:		     Transformacion Agotados
+Desarrollador:  María de los Ángeles Delgado
+Email:          maria_adelgado@eficacia.com
+Fecha           2023/08/04 (YYYY/MM/DD)
+Estado:         Activo
+-----------------------------------------------------------------------------------------------------------------------------------------------*/
+Agotados_Tmp1:
+	LOAD 
+		AGOTADO			     	as Agotado,
+		PRESENTE				as Presente,
+		NO_MANEJANTE			as No_Manejante,
+		CAUSAL_AGOTADO			as Causal,
+		SUB_CAUSAL_AGOTADO		as SubCausal,
+		ID_PRODUCTO		     	as Id_Producto,
+		ID_SUCURSAL		     	as Id_Sucursal,
+		ID_USUARIO				as Id_Usuario,
+		FECHA_CAPTURA			as _Fecha
+	FROM [lib://COMP_Stage (eficacia_admin_analitica)/SGI/Colombia/SEVILLA_SA/Agotados_$(Anno)$(Mes)*.qvd]
+	(qvd);
+
+/*---------*/
+NoConcatenate
+Agotados_Tmp2:
+	LOAD
+		Agotado,
+		Presente, 
+		No_Manejante,
+		Capitalize(Causal)          										as Causal,
+		Capitalize(SubCausal)      											as SubCausal,
+		Id_Producto,
+		Id_Sucursal,
+		Id_Usuario,
+		DATE(left(date(_Fecha,'YYYY-MM-DD'),10),'YYYY/MM/DD')               as Fecha
+	Resident Agotados_Tmp1
+	Where
+		Agotado=1 and (Not IsNull(Causal) or Not IsNull(SubCausal))
+    and Id_Usuario <> '168874';
+		
+Concatenate	
+Agotados_Tmp2:
+	LOAD
+		Agotado,
+		Presente, 
+		No_Manejante,
+		Capitalize(Causal)          										as Causal,
+		Capitalize(SubCausal)      											as SubCausal,
+		Id_Producto,
+		Id_Sucursal,
+		Id_Usuario,
+		DATE(left(date(_Fecha,'YYYY-MM-DD'),10),'YYYY/MM/DD')               as Fecha
+	Resident Agotados_Tmp1
+	Where
+		Agotado=0
+    and Id_Usuario <> '168874';
+	DROP Table Agotados_Tmp1;
+
+NoConcatenate
+Agotados_Tmp3:
+	LOAD
+		Agotado,
+		Presente, 
+		No_Manejante,
+		Causal,
+		SubCausal,
+		Id_Producto,
+		Id_Sucursal,
+		Id_Usuario,
+		Fecha,
+		year(Fecha)&Month(Fecha)	as Periodo
+	Resident Agotados_Tmp2;
+	Drop Table Agotados_Tmp2;
+
+NoConcatenate
+Agotados_Tmp4:
+	LOAD
+		Id_Sucursal,
+		Periodo,
+		Max(Fecha)			as Fecha
+	Resident Agotados_Tmp3
+	Group By
+		Periodo,
+		Id_Sucursal;
+
+Left Join(Agotados_Tmp4)
+	LOAD
+		Agotado,
+		Presente, 
+		No_Manejante,
+		Causal,
+		SubCausal,
+		Id_Producto,
+		Id_Sucursal,
+		Id_Usuario,
+		Fecha,
+		Periodo
+	Resident Agotados_Tmp3;
+	Drop Table Agotados_Tmp3;
+		
+/*---------*/
+NoConcatenate
+Agotados:
+	LOAD Distinct
+		Id_Sucursal&'-'&Id_Usuario&'-'&Id_Producto&'-'&Fecha	as CK.Key2,
+		Agotado													as Agotados.Agotado,
+		Presente												as Agotados.Presente,
+		No_Manejante											as Agotados.No_Manejante,
+		Causal													as Agotados.Causal,
+		SubCausal												as Agotados.SubCausal,
+		Id_Producto												as Agotados.Id_Producto,
+		Id_Sucursal												as Agotados.Id_Sucursal,
+		Id_Usuario												as Agotados.Id_Usuario,
+		Fecha													as Agotados.Fecha
+	Resident Agotados_Tmp4;
+	Drop Table Agotados_Tmp4;
+		
+STORE Agotados INTO [lib://COMP_DataMart (eficacia_admin_analitica)/SGI/Colombia/SEVILLA_SA/_Agotados_$(Anno)$(Mes).qvd];
+Drop Table Agotados;
